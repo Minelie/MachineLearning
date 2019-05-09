@@ -1,0 +1,137 @@
+##Peer-Graded Assignment Machine Learning - Coursera Data Science Specialisation
+
+
+```{r}
+#The goal of this project is to predict the manner in which participants perform barbell lifts. Data was collected from sensors placed on 6 participants on the belt, forearm, arm and dumbell. There are five different ways the exercise could be done, ranging from class A to class E: correctly (A), throwing the elbows to the front (B), lifting the dumbbell only halfway (C), lowering the dumbbell only halfway (D) and throwing the hips to the front (E).The goal is to build a model to predict the class of the movement.
+#The approach chosen here is: 1/exploring data and cleaning, selecting predictors; 2/train the data with Random Forest, Classification Tree and Linear Discriminant Analysis using 5-10 folds cross-validation to measure accuracy of the model; 3/Selecting the model with the highest accuracy and predict the values of the 20 cases in the testing set.
+#The results are: the best model was Random Forest with a 5-fold cross validation that gave an accuracy of >99%. Out of sample accuracy, determined throught the quiz, was >99% as well.
+```
+
+
+#1/ Exploratory analysis and predictors selection
+```{r}
+#Import training set
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+training <- read.csv(url)
+head(training)
+```
+
+```{r}
+str(training)
+#the traning set has 160 variables that include factors and numeric with some missing values.
+```
+
+```{r}
+#Import testing set
+urltest <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testing <- read.csv(urltest)
+str(testing)# the testing set has the same number of variables but it seems that more columns contain missing values.
+```
+
+#1/cleaning data and variable selection
+```{r}
+#Identify columns with >50% of missing data
+PercNA <- apply(training, 2, function(x) sum(is.na(x))/length(x)*100)
+length(which(PercNA<50))#there are 93 columns with less than 50% NAs.
+```
+
+```{r}
+#Only keep columns with less than 50% NAs.
+training2 <- training[,which(PercNA<50)]
+```
+
+```{r}
+#Remove columns with >50% mssing data in testing set and compare remaining columns with training set
+PercNATest <- apply(testing, 2, function(x) sum(is.na(x))/length(x)*100)
+```
+
+```{r}
+length(which(PercNATest<50)) #There are 60 columns left in the testing set meaning that 33 colums from the training set are not relevant.
+```
+```{r}
+#Create new training set with same columns as in testing set and variable to predict "classe".
+training3 <- training[,which(PercNATest<50)]
+str(training3)
+```
+
+```{r}
+training4 <- training3[,8:60] #remove first 7 columns that do no contain sensor data. 
+str(training4)#final training set contains 52 predictors and the variable "classe" to predict.
+```
+
+```{r}
+#convert all variable into numeric
+for (i in 1:52) {
+training4[,i] <- as.numeric(training4[,i])}
+```
+
+```{r}
+#preparing final testing set to use for evaluating model accuracy
+testing2 <- testing[,which(PercNATest<50)]
+testing3 <- testing2[,8:60]
+str(testing3)
+```
+
+
+#2/Train models
+```{r}
+#Train Random Forest model
+
+#configure parallel processing
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+```
+
+```{r}
+#configure trainCOntrol object
+library(caret)
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+```
+
+
+```{r}
+#fit Ranfom Forest model
+RF <- train(classe~.,method="rf",data=training4,trControl=fitControl)
+```
+
+```{r}
+#De-register parallel processing cluster
+stopCluster(cluster)
+registerDoSEQ()
+```
+
+```{r}
+confusionMatrix.train(RF)
+#cross-validation reports an accuracy of >99%
+```
+
+```{r}
+#Train Classfication Tree
+fitControl_Tree <- trainControl(method = "cv",number = 5)
+Tree <- train(classe~.,method="rpart",data=training4,trControl=fitControl_Tree)
+confusionMatrix.train(Tree)
+#cross-validation reports an accuracy of 50%
+```
+
+
+```{r}
+#Train Linear Discriminant Analysis
+fitControl_LDA <- trainControl(method = "cv",number = 10)
+LDA <-  train(classe~.,data=training4,method="lda",trControl=fitControl_LDA)
+confusionMatrix.train(LDA)
+#cross-validation reports an accuracy of 70%
+```
+
+#3/Model selection and out of sample error rate
+```{r}
+#Random Forest is selected as it gives the highest accuracy based on 5 folds cross-validation.
+```
+
+```{r}
+#predictions and accuracy
+pred <- predict(RF,testing3)
+# All predictions in the quiz were correct. Accuracy of the model is thus >99% on the testing set provided.
+```
+
